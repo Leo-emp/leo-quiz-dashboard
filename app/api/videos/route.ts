@@ -6,9 +6,15 @@
 
 import { NextResponse } from "next/server";
 import { listVideos } from "@/lib/db";
+import { getSession } from "@/lib/auth";
 import type { VideoFilters } from "@/lib/types";
 
 export async function GET(request: Request) {
+  const session = await getSession();
+  if (!session.isLoggedIn) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   // Parse query parameters from the URL
   const url = new URL(request.url);
 

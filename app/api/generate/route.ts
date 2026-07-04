@@ -8,6 +8,7 @@
 import { NextResponse } from "next/server";
 import { createVideo, updateVideo, logActivity } from "@/lib/db";
 import { triggerWorkflow } from "@/lib/github";
+import { getSession } from "@/lib/auth";
 import type { Category, TriggerType } from "@/lib/types";
 
 // -- Valid categories (matches pipeline config.py) --
@@ -19,6 +20,11 @@ const DAY_CATEGORIES: Category[] = [
 ];
 
 export async function POST(request: Request) {
+  const session = await getSession();
+  if (!session.isLoggedIn) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const body = await request.json().catch(() => ({}));
 
   // Determine category — "auto" picks today's rotation

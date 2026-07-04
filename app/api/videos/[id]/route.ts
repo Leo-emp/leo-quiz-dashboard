@@ -5,11 +5,17 @@
 
 import { NextResponse } from "next/server";
 import { getVideo, updateVideo } from "@/lib/db";
+import { getSession } from "@/lib/auth";
 
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const session = await getSession();
+  if (!session.isLoggedIn) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const { id } = await params;
   const video = await getVideo(id);
 
@@ -24,6 +30,11 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const patchSession = await getSession();
+  if (!patchSession.isLoggedIn) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const { id } = await params;
 
   // Check video exists

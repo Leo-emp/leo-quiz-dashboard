@@ -8,11 +8,17 @@
 
 import { NextResponse } from "next/server";
 import { getVideo, updateVideo, logActivity } from "@/lib/db";
+import { getSession } from "@/lib/auth";
 
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const session = await getSession();
+  if (!session.isLoggedIn) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const { id } = await params;
   const video = await getVideo(id);
 

@@ -5,13 +5,24 @@
 
 import { NextResponse } from "next/server";
 import { getScheduleConfig, updateScheduleConfig } from "@/lib/db";
+import { getSession } from "@/lib/auth";
 
 export async function GET() {
+  const session = await getSession();
+  if (!session.isLoggedIn) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const config = await getScheduleConfig();
   return NextResponse.json(config);
 }
 
 export async function PUT(request: Request) {
+  const session = await getSession();
+  if (!session.isLoggedIn) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const body = await request.json().catch(() => ({}));
 
   const config = await updateScheduleConfig({
