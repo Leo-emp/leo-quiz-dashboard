@@ -7,8 +7,15 @@
 
 import { NextResponse } from "next/server";
 import { randomBytes } from "crypto";
+import { getSession } from "@/lib/auth";
 
 export async function GET() {
+  // Require admin session before initiating OAuth
+  const session = await getSession();
+  if (!session.isLoggedIn) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const clientId = process.env.YOUTUBE_CLIENT_ID;
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
   const redirectUri = `${appUrl}/api/auth/youtube/callback`;

@@ -13,7 +13,7 @@
 //  Same pattern as Luminous Will's lib/tokens.ts.
 // ─────────────────────────────────────────────────────────────
 
-import { put, list, del } from "@vercel/blob";
+import { put, list, del, get } from "@vercel/blob";
 import type { TokenData, ConnectionStatus } from "./types";
 
 // -- Blob path prefix for all token files --
@@ -31,7 +31,7 @@ export async function saveToken(platform: string, data: TokenData): Promise<void
   // Uses addRandomSuffix: false so we can overwrite on refresh.
   const path = `${TOKEN_PREFIX}${platform}.json`;
   await put(path, JSON.stringify(data), {
-    access: "public",
+    access: "private",
     contentType: "application/json",
     addRandomSuffix: false,
   });
@@ -40,25 +40,24 @@ export async function saveToken(platform: string, data: TokenData): Promise<void
 export async function deleteToken(platform: string): Promise<void> {
   // Removes the token file from Blob — disconnects the platform
   try {
-    const { blobs } = await list({ prefix: `${TOKEN_PREFIX}${platform}.json` });
-    if (blobs.length > 0) {
-      await del(blobs[0].url);
-    }
+    const path = `${TOKEN_PREFIX}${platform}.json`;
+    await del(path);
   } catch {
     // Ignore errors — token may already be gone
   }
 }
 
 async function loadTokenData(platform: string): Promise<TokenData | null> {
-  // Reads raw token data from Blob. Returns null if not connected.
+  // Reads raw token data from private Blob. Returns null if not connected.
   try {
-    const { blobs } = await list({ prefix: `${TOKEN_PREFIX}${platform}.json` });
-    if (blobs.length === 0) return null;
+    const path = `${TOKEN_PREFIX}${platform}.json`;
+    const result = await get(path, { access: "private" });
+    if (!result || !result.stream) return null;
 
-    // Fetch the blob content
-    const response = await fetch(blobs[0].url);
-    if (!response.ok) return null;
-    return (await response.json()) as TokenData;
+    // Read the stream as text, then parse JSON
+    const response = new Response(result.stream);
+    const text = await response.text();
+    return JSON.parse(text) as TokenData;
   } catch (err) {
     console.error(`[TOKENS] loadTokenData error for ${platform}:`, err);
     return null;

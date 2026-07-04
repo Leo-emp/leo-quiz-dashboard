@@ -9,13 +9,21 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { saveToken } from "@/lib/tokens";
+import { getSession } from "@/lib/auth";
 
 export async function GET(request: Request) {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+
+  // Require admin session before completing OAuth
+  const session = await getSession();
+  if (!session.isLoggedIn) {
+    return NextResponse.redirect(`${appUrl}/login`);
+  }
+
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
   const error = url.searchParams.get("error");
   const state = url.searchParams.get("state");
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
   // Handle denial or error from Google
   if (error || !code) {
