@@ -6,7 +6,6 @@
 // ─────────────────────────────────────────────────────────────
 
 import { NextResponse } from "next/server";
-import bcrypt from "bcryptjs";
 import { getSession } from "@/lib/auth";
 
 export async function POST(request: Request) {
@@ -22,20 +21,19 @@ export async function POST(request: Request) {
     );
   }
 
-  // Check email matches the admin email from env
+  // Check credentials against env vars
   const adminEmail = process.env.ADMIN_EMAIL;
-  const adminPasswordHash = process.env.ADMIN_PASSWORD_HASH;
+  const adminPassword = process.env.ADMIN_PASSWORD;
 
-  if (!adminEmail || !adminPasswordHash) {
-    // Server misconfigured — admin credentials not set
-    console.error("[AUTH] ADMIN_EMAIL or ADMIN_PASSWORD_HASH not set");
+  if (!adminEmail || !adminPassword) {
+    console.error("[AUTH] ADMIN_EMAIL or ADMIN_PASSWORD not set");
     return NextResponse.json(
       { error: "Server configuration error" },
       { status: 500 }
     );
   }
 
-  // Verify email matches (case-insensitive)
+  // Verify email (case-insensitive)
   if (email.toLowerCase() !== adminEmail.toLowerCase()) {
     return NextResponse.json(
       { error: "Invalid credentials" },
@@ -43,9 +41,8 @@ export async function POST(request: Request) {
     );
   }
 
-  // Verify password against bcrypt hash
-  const passwordValid = await bcrypt.compare(password, adminPasswordHash);
-  if (!passwordValid) {
+  // Verify password (direct comparison)
+  if (password !== adminPassword) {
     return NextResponse.json(
       { error: "Invalid credentials" },
       { status: 401 }
