@@ -1,27 +1,30 @@
 // ─────────────────────────────────────────────────────────────
-//  Root layout — the outermost wrapper for every page in the
-//  App Router. Kept minimal for Task 1: it just mounts the
-//  global stylesheet (Tailwind) and sets basic page metadata.
-//  Later tasks will add fonts, nav, and auth-aware chrome here.
+//  Root layout — wraps every page with the dark theme and sidebar.
+//  The sidebar only shows on authenticated pages (not /login).
+//  Uses a conditional check via the pathname.
 // ─────────────────────────────────────────────────────────────
+
 import type { Metadata } from "next";
 import "./globals.css";
+import LayoutShell from "@/components/layout-shell";
 
-// -- Page metadata shown in the browser tab / search results --
+// -- App metadata shown in browser tab --
 export const metadata: Metadata = {
   title: "LeoQuiz Dashboard",
-  description: "Admin dashboard for the LeoQuiz video pipeline",
+  description: "Manage Leo Quiz automated kids video pipeline",
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
     <html lang="en">
-      {/* body just renders whatever page/layout is active */}
-      <body>{children}</body>
+      <body className="antialiased">
+        {/* LayoutShell handles showing/hiding the sidebar based on route */}
+        <LayoutShell>{children}</LayoutShell>
+      </body>
     </html>
   );
 }
