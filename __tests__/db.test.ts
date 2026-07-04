@@ -1,6 +1,7 @@
 // ─────────────────────────────────────────────────────────────
-//  Database layer tests — uses a local SQLite file.
+//  Database layer tests — uses in-memory SQLite.
 //  Tests all CRUD operations, filters, stats, and activity log.
+//  The vitest.setup.ts file configures in-memory mode automatically.
 // ─────────────────────────────────────────────────────────────
 import { describe, it, expect, beforeAll } from "vitest";
 import {

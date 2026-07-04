@@ -12,6 +12,9 @@ export default defineConfig({
     environment: "node",
     // Allow describe/it/expect as globals (no import needed per-file)
     globals: true,
+    // Setup file runs before any tests are imported
+    // Sets env vars for in-memory SQLite to ensure test idempotency
+    setupFiles: ["./vitest.setup.ts"],
   },
   resolve: {
     alias: {

@@ -10,6 +10,8 @@
 // ─────────────────────────────────────────────────────────────
 
 import { createClient } from "@libsql/client";
+import { readFileSync } from "fs";
+import path from "path";
 import { ulid } from "ulid";
 import type {
   Video,
@@ -27,53 +29,16 @@ const db = createClient({
 });
 
 // -- Initialize schema on first import --
-// Reads schema.sql and executes it. Safe to run multiple times
-// because all statements use IF NOT EXISTS.
+// Reads schema.sql and executes all statements.
+// Safe to run multiple times because all statements use IF NOT EXISTS.
 export async function initializeDatabase(): Promise<void> {
-  // Schema is executed as raw SQL statements
-  await db.executeMultiple(`
-    CREATE TABLE IF NOT EXISTS videos (
-      id TEXT PRIMARY KEY,
-      category TEXT NOT NULL,
-      status TEXT NOT NULL DEFAULT 'generating',
-      trigger_type TEXT NOT NULL DEFAULT 'manual',
-      title TEXT,
-      description TEXT,
-      tags TEXT,
-      hashtags TEXT,
-      video_url TEXT,
-      thumbnail_url TEXT,
-      metadata_json TEXT,
-      github_run_id TEXT,
-      rounds_count INTEGER NOT NULL DEFAULT 5,
-      platform TEXT NOT NULL DEFAULT 'both',
-      scheduled_at TEXT,
-      created_at TEXT NOT NULL,
-      reviewed_at TEXT,
-      uploaded_at TEXT
-    );
-    CREATE INDEX IF NOT EXISTS idx_videos_status ON videos(status);
-    CREATE INDEX IF NOT EXISTS idx_videos_category ON videos(category);
-    CREATE INDEX IF NOT EXISTS idx_videos_scheduled ON videos(status, scheduled_at);
-    CREATE TABLE IF NOT EXISTS schedule_config (
-      id INTEGER PRIMARY KEY DEFAULT 1,
-      auto_enabled INTEGER NOT NULL DEFAULT 0,
-      daily_hour_utc INTEGER NOT NULL DEFAULT 6,
-      daily_minute_utc INTEGER NOT NULL DEFAULT 0,
-      weekly_day INTEGER NOT NULL DEFAULT 6,
-      weekly_hour_utc INTEGER NOT NULL DEFAULT 8,
-      updated_at TEXT
-    );
-    INSERT OR IGNORE INTO schedule_config (id) VALUES (1);
-    CREATE TABLE IF NOT EXISTS activity_log (
-      id TEXT PRIMARY KEY,
-      action TEXT NOT NULL,
-      video_id TEXT,
-      message TEXT NOT NULL,
-      created_at TEXT NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS idx_activity_created ON activity_log(created_at DESC);
-  `);
+  // Read the schema file from the lib directory
+  const schemaPath = path.join(process.cwd(), "lib", "schema.sql");
+  const schema = readFileSync(schemaPath, "utf-8");
+
+  // Execute all SQL statements from the schema file
+  // The schema uses IF NOT EXISTS clauses, so it's safe to run repeatedly
+  await db.executeMultiple(schema);
 }
 
 // ─── Video CRUD ──────────────────────────────────────────────
