@@ -60,3 +60,60 @@ CREATE TABLE IF NOT EXISTS activity_log (
 
 -- Index for recent activity queries (sorted by time)
 CREATE INDEX IF NOT EXISTS idx_activity_created ON activity_log(created_at DESC);
+
+-- ─────────────────────────────────────────────────────────────
+--  Pro Upgrade tables: analytics, thumbnail tests
+-- ─────────────────────────────────────────────────────────────
+
+-- Video analytics — per-video per-platform stats pulled from APIs
+CREATE TABLE IF NOT EXISTS video_analytics (
+  id TEXT PRIMARY KEY,
+  video_id TEXT NOT NULL,
+  platform TEXT NOT NULL,
+  platform_video_id TEXT,
+  views INTEGER DEFAULT 0,
+  likes INTEGER DEFAULT 0,
+  comments INTEGER DEFAULT 0,
+  shares INTEGER DEFAULT 0,
+  saves INTEGER DEFAULT 0,
+  watch_time_minutes REAL DEFAULT 0.0,
+  impressions INTEGER DEFAULT 0,
+  ctr REAL DEFAULT 0.0,
+  fetched_at TEXT NOT NULL,
+  FOREIGN KEY (video_id) REFERENCES videos(id)
+);
+
+-- Index for fetching analytics by video
+CREATE INDEX IF NOT EXISTS idx_analytics_video ON video_analytics(video_id);
+
+-- Index for fetching analytics by platform
+CREATE INDEX IF NOT EXISTS idx_analytics_platform ON video_analytics(platform);
+
+-- Channel analytics — daily channel-level stats per platform
+CREATE TABLE IF NOT EXISTS channel_analytics (
+  id TEXT PRIMARY KEY,
+  platform TEXT NOT NULL,
+  date TEXT NOT NULL,
+  subscribers INTEGER DEFAULT 0,
+  total_views INTEGER DEFAULT 0,
+  new_videos INTEGER DEFAULT 0,
+  fetched_at TEXT NOT NULL,
+  UNIQUE(platform, date)
+);
+
+-- Thumbnail A/B test tracking
+CREATE TABLE IF NOT EXISTS thumbnail_tests (
+  id TEXT PRIMARY KEY,
+  video_id TEXT NOT NULL,
+  variant TEXT NOT NULL,
+  platform TEXT NOT NULL,
+  uploaded_at TEXT,
+  impressions INTEGER DEFAULT 0,
+  clicks INTEGER DEFAULT 0,
+  ctr REAL DEFAULT 0.0,
+  checked_at TEXT,
+  FOREIGN KEY (video_id) REFERENCES videos(id)
+);
+
+-- Index for thumbnail CTR queries by video
+CREATE INDEX IF NOT EXISTS idx_thumbtests_video ON thumbnail_tests(video_id);

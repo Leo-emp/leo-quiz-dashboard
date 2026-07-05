@@ -37,7 +37,7 @@ describe("Video CRUD", () => {
     expect(video.status).toBe("generating");
     expect(video.trigger_type).toBe("manual");
     expect(video.rounds_count).toBe(5);
-    expect(video.platform).toBe("both");
+    expect(video.platform).toBe("all");
     expect(video.created_at).toBeTruthy();
 
     // Retrieve it by ID

@@ -172,15 +172,17 @@ export default function MetadataEditor({ video, onChange }: MetadataEditorProps)
       <div>
         <label className="block text-sm text-gray-300 mb-1.5">Platform</label>
         <select
-          defaultValue={video.platform || "both"}
+          defaultValue={video.platform || "all"}
           onChange={(e) => onChange({ platform: e.target.value as Platform })}
           className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10
                      text-white text-sm focus:outline-none focus:border-indigo-500/50
                      transition-colors"
         >
-          <option value="both">YouTube + TikTok</option>
+          <option value="all">All Platforms</option>
           <option value="youtube">YouTube Only</option>
           <option value="tiktok">TikTok Only</option>
+          <option value="instagram">Instagram Only</option>
+          <option value="facebook">Facebook Only</option>
         </select>
       </div>
     </div>

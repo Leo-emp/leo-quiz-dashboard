@@ -12,7 +12,7 @@ import { triggerUploadWorkflow } from "@/lib/github";
 import { getSession } from "@/lib/auth";
 
 // -- Allowed platforms for upload --
-const VALID_PLATFORMS = ["youtube", "tiktok", "both"];
+const VALID_PLATFORMS = ["youtube", "tiktok", "instagram", "facebook", "all"];
 
 // -- Max lengths for workflow dispatch inputs --
 const MAX_TITLE_LENGTH = 200;
