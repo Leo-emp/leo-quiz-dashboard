@@ -1,0 +1,91 @@
+// ─────────────────────────────────────────────────────────────
+//  GET /api/auth/tiktok/callback
+//  TikTok redirects here after the user approves.
+//  Exchanges the auth code for access + refresh tokens,
+//  fetches the username, saves tokens to Blob,
+//  and redirects to /settings.
+// ─────────────────────────────────────────────────────────────
+
+import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
+import { saveToken } from "@/lib/tokens";
+import { getSession } from "@/lib/auth";
+
+export async function GET(request: Request) {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+
+  // Require admin session before completing OAuth
+  const session = await getSession();
+  if (!session.isLoggedIn) {
+    return NextResponse.redirect(`${appUrl}/login`);
+  }
+
+  const url = new URL(request.url);
+  const code = url.searchParams.get("code");
+  const error = url.searchParams.get("error");
+  const state = url.searchParams.get("state");
+
+  // Handle denial or error from TikTok
+  if (error || !code) {
+    return NextResponse.redirect(`${appUrl}/settings?error=tiktok_denied`);
+  }
+
+  // Verify CSRF state token
+  const cookieStore = await cookies();
+  const savedState = cookieStore.get("oauth_state_tiktok")?.value;
+  if (!state || !savedState || state !== savedState) {
+    return NextResponse.redirect(`${appUrl}/settings?error=tiktok_csrf`);
+  }
+
+  try {
+    // Exchange auth code for access + refresh tokens
+    const tokenResponse = await fetch("https://open.tiktokapis.com/v2/oauth/token/", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_key: process.env.TIKTOK_CLIENT_KEY || "",
+        client_secret: process.env.TIKTOK_CLIENT_SECRET || "",
+        code,
+        grant_type: "authorization_code",
+        redirect_uri: `${appUrl}/api/auth/tiktok/callback`,
+      }).toString(),
+    });
+
+    if (!tokenResponse.ok) {
+      return NextResponse.redirect(`${appUrl}/settings?error=tiktok_token_failed`);
+    }
+
+    const tokens = await tokenResponse.json();
+
+    // Get the account name for display in settings
+    let accountName = "TikTok Account";
+    try {
+      const userResponse = await fetch(
+        "https://open.tiktokapis.com/v2/user/info/?fields=display_name",
+        { headers: { Authorization: `Bearer ${tokens.access_token}` } }
+      );
+      if (userResponse.ok) {
+        const userData = await userResponse.json();
+        accountName = userData.data?.user?.display_name || accountName;
+      }
+    } catch {
+      // Fallback to default name
+    }
+
+    // Save tokens to Vercel Blob
+    await saveToken("tiktok", {
+      refresh_token: tokens.refresh_token,
+      access_token: tokens.access_token,
+      expires_at: Math.floor(Date.now() / 1000) + (tokens.expires_in || 86400),
+      account_name: accountName,
+    });
+
+    // Redirect to settings with success indicator
+    const successResponse = NextResponse.redirect(`${appUrl}/settings?connected=tiktok`);
+    successResponse.cookies.delete("oauth_state_tiktok");
+    return successResponse;
+  } catch (err) {
+    console.error("[TIKTOK_CALLBACK] Error:", err);
+    return NextResponse.redirect(`${appUrl}/settings?error=tiktok_failed`);
+  }
+}

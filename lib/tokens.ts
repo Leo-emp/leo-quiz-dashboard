@@ -1,5 +1,6 @@
 // ─────────────────────────────────────────────────────────────
-//  OAuth token management for YouTube (and future TikTok).
+//  OAuth token management for all 4 platforms:
+//  YouTube, TikTok, Instagram, Facebook.
 //  Stores tokens in Vercel Blob as private JSON files.
 //  Auto-refreshes expired access tokens using the refresh token.
 //
@@ -9,8 +10,9 @@
 //
 //  Token files in Blob:
 //    tokens/youtube.json
-//
-//  Same pattern as Luminous Will's lib/tokens.ts.
+//    tokens/tiktok.json
+//    tokens/instagram.json
+//    tokens/facebook.json
 // ─────────────────────────────────────────────────────────────
 
 import { put, list, del, get } from "@vercel/blob";
@@ -68,46 +70,109 @@ export async function refreshAccessToken(
   platform: string,
   tokenData: TokenData
 ): Promise<TokenData | null> {
-  // Exchanges the refresh token for a fresh access token.
+  // Dispatches to the correct refresh endpoint based on platform.
   // Returns updated TokenData on success, null if refresh was rejected.
-  const clientId = process.env.YOUTUBE_CLIENT_ID || "";
-  const clientSecret = process.env.YOUTUBE_CLIENT_SECRET || "";
-
   try {
-    const response = await fetch(YOUTUBE_TOKEN_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        client_id: clientId,
-        client_secret: clientSecret,
-        grant_type: "refresh_token",
-        refresh_token: tokenData.refresh_token,
-      }).toString(),
-    });
-
-    if (!response.ok) {
-      console.error(`[TOKENS] Refresh failed for ${platform}: ${response.status}`);
-      return null;
+    if (platform === "tiktok") {
+      return await refreshTikTokToken(tokenData);
+    } else if (platform === "instagram" || platform === "facebook") {
+      return await refreshMetaToken(platform, tokenData);
+    } else {
+      return await refreshYouTubeToken(tokenData);
     }
-
-    const data = await response.json();
-
-    // Build updated token data — some providers return a new refresh token
-    const updated: TokenData = {
-      refresh_token: data.refresh_token || tokenData.refresh_token,
-      access_token: data.access_token,
-      expires_at: Math.floor(Date.now() / 1000) + (data.expires_in || 3600),
-      account_name: tokenData.account_name,
-    };
-
-    // Persist the refreshed tokens back to Blob
-    await saveToken(platform, updated);
-
-    return updated;
   } catch (error) {
     console.error(`[TOKENS] Refresh error for ${platform}:`, error);
     return null;
   }
+}
+
+async function refreshYouTubeToken(tokenData: TokenData): Promise<TokenData | null> {
+  // YouTube: standard OAuth2 refresh_token grant
+  const response = await fetch(YOUTUBE_TOKEN_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: process.env.YOUTUBE_CLIENT_ID || "",
+      client_secret: process.env.YOUTUBE_CLIENT_SECRET || "",
+      grant_type: "refresh_token",
+      refresh_token: tokenData.refresh_token,
+    }).toString(),
+  });
+
+  if (!response.ok) {
+    console.error(`[TOKENS] YouTube refresh failed: ${response.status}`);
+    return null;
+  }
+
+  const data = await response.json();
+  const updated: TokenData = {
+    refresh_token: data.refresh_token || tokenData.refresh_token,
+    access_token: data.access_token,
+    expires_at: Math.floor(Date.now() / 1000) + (data.expires_in || 3600),
+    account_name: tokenData.account_name,
+  };
+
+  await saveToken("youtube", updated);
+  return updated;
+}
+
+async function refreshTikTokToken(tokenData: TokenData): Promise<TokenData | null> {
+  // TikTok: uses its own token refresh endpoint
+  const response = await fetch("https://open.tiktokapis.com/v2/oauth/token/", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_key: process.env.TIKTOK_CLIENT_KEY || "",
+      client_secret: process.env.TIKTOK_CLIENT_SECRET || "",
+      grant_type: "refresh_token",
+      refresh_token: tokenData.refresh_token,
+    }).toString(),
+  });
+
+  if (!response.ok) {
+    console.error(`[TOKENS] TikTok refresh failed: ${response.status}`);
+    return null;
+  }
+
+  const data = await response.json();
+  const updated: TokenData = {
+    refresh_token: data.refresh_token || tokenData.refresh_token,
+    access_token: data.access_token,
+    expires_at: Math.floor(Date.now() / 1000) + (data.expires_in || 86400),
+    account_name: tokenData.account_name,
+  };
+
+  await saveToken("tiktok", updated);
+  return updated;
+}
+
+async function refreshMetaToken(platform: string, tokenData: TokenData): Promise<TokenData | null> {
+  // Meta (Instagram/Facebook): exchange for a fresh long-lived token
+  const params = new URLSearchParams({
+    grant_type: "fb_exchange_token",
+    client_id: process.env.META_APP_ID || "",
+    client_secret: process.env.META_APP_SECRET || "",
+    fb_exchange_token: tokenData.access_token,
+  });
+
+  const response = await fetch(
+    `https://graph.facebook.com/v21.0/oauth/access_token?${params.toString()}`
+  );
+
+  if (!response.ok) {
+    console.error(`[TOKENS] Meta refresh failed for ${platform}: ${response.status}`);
+    return null;
+  }
+
+  const data = await response.json();
+  const updated: TokenData = {
+    ...tokenData,
+    access_token: data.access_token,
+    expires_at: Math.floor(Date.now() / 1000) + (data.expires_in || 5184000),
+  };
+
+  await saveToken(platform, updated);
+  return updated;
 }
 
 export async function getToken(platform: string): Promise<TokenData | null> {
@@ -129,9 +194,9 @@ export async function getToken(platform: string): Promise<TokenData | null> {
 }
 
 export async function getConnectionStatus(): Promise<Record<string, ConnectionStatus>> {
-  // Returns connection status for YouTube (and future platforms).
+  // Returns connection status for all 4 platforms.
   // Used by the settings page to show connected/disconnected state.
-  const platforms = ["youtube"];
+  const platforms = ["youtube", "tiktok", "instagram", "facebook"];
   const result: Record<string, ConnectionStatus> = {};
 
   for (const platform of platforms) {

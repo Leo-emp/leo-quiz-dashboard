@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────
 //  POST /api/auth/disconnect
 //  Disconnects a platform by deleting its token from Blob.
-//  Body: { platform: "youtube" }
+//  Body: { platform: "youtube" | "tiktok" | "instagram" | "facebook" }
 // ─────────────────────────────────────────────────────────────
 
 import { NextResponse } from "next/server";
@@ -19,7 +19,7 @@ export async function POST(request: Request) {
   const platform = body.platform as string;
 
   // Only allow known platforms
-  if (!platform || !["youtube"].includes(platform)) {
+  if (!platform || !["youtube", "tiktok", "instagram", "facebook"].includes(platform)) {
     return NextResponse.json({ error: "Invalid platform" }, { status: 400 });
   }
 
