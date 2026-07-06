@@ -33,10 +33,11 @@ function getHeaders() {
 export async function triggerWorkflow(
   videoId: string,
   category: string,
-  rounds: number
+  rounds: number,
+  format: string = "short"
 ): Promise<number | null> {
   // Triggers the daily.yml workflow via workflow_dispatch.
-  // Passes video_id, category, and rounds as inputs so the
+  // Passes video_id, category, rounds, and format as inputs so the
   // pipeline knows which dashboard record to callback to.
   // Returns the workflow run ID (or null on failure).
   const { owner, repo } = getRepoInfo();
@@ -53,6 +54,7 @@ export async function triggerWorkflow(
           video_id: videoId,
           category,
           rounds: String(rounds),
+          format,
         },
       }),
     }
