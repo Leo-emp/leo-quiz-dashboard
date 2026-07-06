@@ -1,18 +1,16 @@
 // ─────────────────────────────────────────────────────────────
 //  POST /api/videos/[id]/upload
-//  Triggers the upload GitHub Action for an approved video.
-//  Sends video URL + metadata to the upload workflow which
-//  handles YouTube/TikTok publishing via the pipeline repo.
+//  Triggers upload to ALL connected platforms automatically.
+//  Gets connected platforms via getConnectionStatus(), then
+//  dispatches parallel upload workflows for each connected one.
 //  Protected by admin session + status gate + input validation.
 // ─────────────────────────────────────────────────────────────
 
 import { NextResponse } from "next/server";
 import { getVideo, updateVideo, logActivity } from "@/lib/db";
 import { triggerUploadWorkflow } from "@/lib/github";
+import { getConnectionStatus } from "@/lib/tokens";
 import { getSession } from "@/lib/auth";
-
-// -- Allowed platforms for upload --
-const VALID_PLATFORMS = ["youtube", "tiktok", "instagram", "facebook", "all"];
 
 // -- Max lengths for workflow dispatch inputs --
 const MAX_TITLE_LENGTH = 200;
@@ -53,46 +51,101 @@ export async function POST(
     return NextResponse.json({ error: "No video file available" }, { status: 400 });
   }
 
-  // -- Validate platform --
-  const platform = VALID_PLATFORMS.includes(video.platform) ? video.platform : "youtube";
+  // -- Get all connected platforms --
+  const connectionStatus = await getConnectionStatus();
+  const connectedPlatforms = Object.entries(connectionStatus)
+    .filter(([, status]) => status.connected)
+    .map(([platform]) => platform);
 
-  // -- Parse and validate tags --
-  let tags: string[] = [];
+  if (connectedPlatforms.length === 0) {
+    return NextResponse.json(
+      { error: "No platforms connected. Connect at least one in Settings." },
+      { status: 400 }
+    );
+  }
+
+  // -- Parse platform-specific metadata if available --
+  let platformMetadata: Record<string, { title: string; description: string; tags: string[] }> = {};
+  try {
+    if (video.platform_metadata) {
+      platformMetadata = JSON.parse(video.platform_metadata);
+    }
+  } catch {
+    // Fall back to generic metadata
+  }
+
+  // -- Parse default tags --
+  let defaultTags: string[] = [];
   try {
     const parsed = video.tags ? JSON.parse(video.tags) : [];
     if (Array.isArray(parsed)) {
-      tags = parsed
+      defaultTags = parsed
         .filter((t): t is string => typeof t === "string")
         .map((t) => t.slice(0, MAX_TAG_LENGTH))
         .slice(0, MAX_TAGS);
     }
   } catch {
-    tags = [];
+    defaultTags = [];
   }
 
-  // -- Sanitize title and description --
-  const title = (video.title || `Leo Quiz: ${video.category}`).slice(0, MAX_TITLE_LENGTH);
-  const description = (video.description || "").slice(0, MAX_DESCRIPTION_LENGTH);
+  // -- Default metadata --
+  const defaultTitle = (video.title || `Leo Quiz: ${video.category}`).slice(0, MAX_TITLE_LENGTH);
+  const defaultDescription = (video.description || "").slice(0, MAX_DESCRIPTION_LENGTH);
 
-  // Trigger the upload workflow via GitHub Actions
-  const runId = await triggerUploadWorkflow(
-    video.id,
-    video.video_url,
-    { title, description, tags },
-    platform
+  // -- Dispatch upload to ALL connected platforms in parallel --
+  const results = await Promise.allSettled(
+    connectedPlatforms.map(async (platform) => {
+      // Use platform-specific metadata if available, else default
+      const meta = platformMetadata[platform] || {
+        title: defaultTitle,
+        description: defaultDescription,
+        tags: defaultTags,
+      };
+
+      const runId = await triggerUploadWorkflow(
+        video.id,
+        video.video_url!,
+        {
+          title: (meta.title || defaultTitle).slice(0, MAX_TITLE_LENGTH),
+          description: (meta.description || defaultDescription).slice(0, MAX_DESCRIPTION_LENGTH),
+          tags: meta.tags || defaultTags,
+        },
+        platform
+      );
+
+      if (runId) {
+        await logActivity("uploaded", video.id, `Upload started to ${platform}: ${meta.title || defaultTitle}`);
+      }
+
+      return { platform, runId };
+    })
   );
 
-  // Log failure if the workflow couldn't be triggered
-  if (!runId) {
-    await logActivity("failed", video.id, `Upload trigger failed: ${title}`);
-    return NextResponse.json({ error: "Failed to trigger upload" }, { status: 500 });
+  // -- Collect results --
+  const uploads: Record<string, number | null> = {};
+  let anySuccess = false;
+
+  for (const result of results) {
+    if (result.status === "fulfilled") {
+      uploads[result.value.platform] = result.value.runId;
+      if (result.value.runId) anySuccess = true;
+    }
   }
 
-  // Mark as uploading to prevent duplicate triggers
-  await updateVideo(video.id, { github_run_id: String(runId) });
+  if (!anySuccess) {
+    await logActivity("failed", video.id, `Upload trigger failed to all platforms`);
+    return NextResponse.json({ error: "Failed to trigger upload to any platform" }, { status: 500 });
+  }
 
-  // Log the upload start
-  await logActivity("uploaded", video.id, `Upload started: ${title}`);
+  // Store the first successful run ID for status polling
+  const firstRunId = Object.values(uploads).find((id) => id !== null);
+  if (firstRunId) {
+    await updateVideo(video.id, { github_run_id: String(firstRunId) });
+  }
 
-  return NextResponse.json({ success: true, run_id: runId });
+  return NextResponse.json({
+    success: true,
+    platforms: uploads,
+    connected: connectedPlatforms,
+  });
 }
