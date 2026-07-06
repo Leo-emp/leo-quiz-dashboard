@@ -14,6 +14,7 @@ import {
   Sparkles,
   CheckSquare,
   History,
+  BarChart3,
   Settings,
   LogOut,
   Clapperboard,
@@ -25,6 +26,7 @@ const navItems = [
   { href: "/generate", label: "Generate", icon: Sparkles },
   { href: "/queue", label: "Queue", icon: CheckSquare },
   { href: "/history", label: "History", icon: History },
+  { href: "/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
