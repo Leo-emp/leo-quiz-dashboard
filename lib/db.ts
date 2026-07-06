@@ -424,6 +424,20 @@ export async function getChannelAnalytics(platform: string, days: number = 30): 
   }));
 }
 
+export async function saveChannelAnalytics(data: {
+  platform: string; date: string; subscribers: number;
+  total_views: number; new_videos: number;
+}): Promise<void> {
+  // Upserts channel analytics for a platform on a given date
+  const id = ulid();
+  await db.execute({
+    sql: `INSERT OR REPLACE INTO channel_analytics
+          (id, platform, date, subscribers, total_views, new_videos, fetched_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    args: [id, data.platform, data.date, data.subscribers, data.total_views, data.new_videos, new Date().toISOString()],
+  });
+}
+
 // ─── Thumbnail Tests ────────────────────────────────────────
 
 export async function saveThumbnailTest(data: Partial<ThumbnailTest>): Promise<void> {
@@ -494,6 +508,25 @@ export async function getAnalyticsOverview(): Promise<AnalyticsOverview> {
     videos_this_week: Number(weekResult.rows[0]?.c ?? 0),
     average_ctr: Number(ctrResult.rows[0]?.avg_ctr ?? 0),
   };
+}
+
+export async function getCategoryAnalytics(): Promise<{ category: string; avg_views: number; total_views: number }[]> {
+  // Returns average and total views per quiz category
+  const result = await db.execute(`
+    SELECT v.category,
+           COALESCE(AVG(va.views), 0) as avg_views,
+           COALESCE(SUM(va.views), 0) as total_views
+    FROM videos v
+    LEFT JOIN video_analytics va ON v.id = va.video_id
+    GROUP BY v.category
+    ORDER BY total_views DESC
+  `);
+
+  return result.rows.map((row) => ({
+    category: row.category as string,
+    avg_views: Math.round(Number(row.avg_views)),
+    total_views: Number(row.total_views),
+  }));
 }
 
 export async function getTopVideos(limit: number = 10, platform?: string): Promise<(Video & { total_views: number })[]> {
