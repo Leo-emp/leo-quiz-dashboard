@@ -9,6 +9,7 @@
 import { NextResponse } from "next/server";
 import { listVideos, saveVideoAnalytics, saveChannelAnalytics } from "@/lib/db";
 import { getToken, getConnectionStatus } from "@/lib/tokens";
+import { notifyAdmin } from "@/lib/notify-admin";
 
 export async function POST(request: Request) {
   // -- Verify cron secret --
@@ -77,6 +78,8 @@ export async function POST(request: Request) {
       }
     } catch (err) {
       console.error(`[ANALYTICS] Error pulling ${platform}:`, err);
+      // # Alert admin when analytics pull fails for a platform
+      await notifyAdmin("Pull Analytics", err, { platform });
     }
   }
 

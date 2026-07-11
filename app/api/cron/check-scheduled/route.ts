@@ -11,6 +11,7 @@ import { NextResponse } from "next/server";
 import { listVideos, updateVideo, logActivity } from "@/lib/db";
 import { triggerUploadWorkflow } from "@/lib/github";
 import { getConnectionStatus } from "@/lib/tokens";
+import { notifyAdmin } from "@/lib/notify-admin";
 
 export async function POST(request: Request) {
   // -- Verify cron secret (Vercel sends this automatically) --
@@ -20,6 +21,9 @@ export async function POST(request: Request) {
   if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  // # Top-level try/catch — catches fatal errors from getConnectionStatus() or listVideos()
+  try {
 
   // -- Get all connected platforms once (shared across all videos) --
   const connectionStatus = await getConnectionStatus();
@@ -43,6 +47,8 @@ export async function POST(request: Request) {
     if (!video.video_url) {
       await updateVideo(video.id, { status: "failed" });
       await logActivity("failed", video.id, `No video file for scheduled post: ${video.title}`);
+      // # Alert admin when a scheduled video has no file attached
+      await notifyAdmin("Check Scheduled", new Error("No video file"), { videoId: video.id, title: video.title });
       continue;
     }
 
@@ -104,6 +110,12 @@ export async function POST(request: Request) {
       triggered++;
     } else {
       await logActivity("failed", video.id, `Scheduled upload trigger failed: ${defaultTitle}`);
+      // # Alert admin when ALL platform uploads fail for a video
+      await notifyAdmin("Check Scheduled", new Error("All platform uploads failed"), {
+        videoId: video.id,
+        title: defaultTitle,
+        platforms: connectedPlatforms,
+      });
     }
   }
 
@@ -113,4 +125,14 @@ export async function POST(request: Request) {
     platforms_connected: connectedPlatforms.length,
     timestamp: now.toISOString(),
   });
+
+  } catch (err) {
+    // # Fatal error — alert admin and return 500
+    console.error("[CheckScheduled] Fatal error:", err);
+    await notifyAdmin("Check Scheduled", err, { fatal: true });
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Unknown error" },
+      { status: 500 }
+    );
+  }
 }
