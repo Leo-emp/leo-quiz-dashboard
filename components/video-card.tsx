@@ -75,9 +75,17 @@ export default function VideoCard({ video, onApprove, onReject }: VideoCardProps
           <div className="flex items-center gap-2 flex-wrap">
             <StatusBadge status={video.status} />
             <CategoryBadge category={video.category} />
+            {/* Format badge — shown for all non-short formats */}
             {video.video_format && video.video_format !== "short" && (
               <span className="px-2 py-0.5 rounded-md bg-indigo-500/20 text-indigo-300 text-xs font-medium">
-                {video.video_format === "long" ? "Long-form" : "Mega Quiz"}
+                {/* Map format values to user-friendly labels */}
+                {video.video_format === "long"
+                  ? "Long-form"
+                  : video.video_format === "mega"
+                    ? "Mega Quiz"
+                    : video.video_format === "speed"
+                      ? "Speed Quiz"
+                      : video.video_format}
               </span>
             )}
             <span className="text-xs text-gray-500">

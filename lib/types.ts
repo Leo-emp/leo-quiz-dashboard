@@ -28,8 +28,9 @@ export type Category =
 // -- How the video was triggered --
 export type TriggerType = "manual" | "automated";
 
-// -- Video format (short/long/mega) --
-export type VideoFormat = "short" | "long" | "mega";
+// -- Video format (short/long/mega/speed) --
+// speed = Quiz Blitz style: 120 rounds, 3-second timer, real photos, 16:9 landscape
+export type VideoFormat = "short" | "long" | "mega" | "speed";
 
 // -- Target posting platform --
 // Includes all 4 platforms plus "all" (post to every connected platform)
@@ -65,7 +66,7 @@ export interface Video {
   rounds_count: number;
   // Target posting platform
   platform: Platform;
-  // Video format (short, long, mega)
+  // Video format (short, long, mega, speed)
   video_format: VideoFormat;
   // Per-platform upload URLs (null = not uploaded to that platform)
   youtube_url: string | null;

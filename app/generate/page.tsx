@@ -16,7 +16,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import { useState, useEffect, useCallback } from "react";
-import { Sparkles, Loader2, Film, Tv, Trophy, Layers } from "lucide-react";
+import { Sparkles, Loader2, Film, Tv, Trophy, Layers, Zap } from "lucide-react";
 import ScheduleForm from "@/components/schedule-form";
 import StatusBadge from "@/components/status-badge";
 import type { ScheduleConfig, VideoStatus } from "@/lib/types";
@@ -64,6 +64,15 @@ const formats = [
     desc: "16:9 · 100 rounds · ~15 min",
     rounds: 100,
     icon: Trophy,
+    recommended: false,
+  },
+  // Speed Quiz — Quiz Blitz style, 120 rapid-fire rounds with 3-second timer
+  {
+    value: "speed",
+    label: "Speed Quiz",
+    desc: "16:9 · 120 rounds · ~20 min",
+    rounds: 120,
+    icon: Zap,
     recommended: false,
   },
 ];
@@ -274,7 +283,7 @@ export default function GeneratePage() {
               <input
                 type="number"
                 min={3}
-                max={selectedFormat.value === "mega" ? 150 : selectedFormat.value === "long" ? 80 : 10}
+                max={selectedFormat.value === "speed" ? 150 : selectedFormat.value === "mega" ? 150 : selectedFormat.value === "long" ? 80 : 10}
                 value={selectedFormat.rounds}
                 disabled
                 className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10
@@ -324,7 +333,16 @@ export default function GeneratePage() {
                     }
                   />
                   <span className="text-sm text-gray-300">
-                    {tracker.format === "short" ? "Short" : tracker.format === "long" ? "Long-form" : tracker.format === "mega" ? "Mega" : tracker.format}
+                    {/* Map format values to user-friendly display labels */}
+                    {tracker.format === "short"
+                      ? "Short"
+                      : tracker.format === "long"
+                        ? "Long-form"
+                        : tracker.format === "mega"
+                          ? "Mega"
+                          : tracker.format === "speed"
+                            ? "Speed Quiz"
+                            : tracker.format}
                     : {tracker.status}
                   </span>
                 </div>

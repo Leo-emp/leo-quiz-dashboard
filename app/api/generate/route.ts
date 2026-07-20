@@ -89,11 +89,13 @@ export async function POST(request: Request) {
     });
   }
 
-  // -- Single format: short, long, or mega --
+  // -- Single format: short, long, mega, or speed --
+  // Each format maps to a preset round count and VideoFormat value
   const formatConfig: Record<string, { rounds: number; videoFormat: VideoFormat }> = {
     short: { rounds: 6, videoFormat: "short" },
     long: { rounds: 60, videoFormat: "long" },
     mega: { rounds: 100, videoFormat: "mega" },
+    speed: { rounds: 120, videoFormat: "speed" },  // Quiz Blitz style: 120 rapid-fire rounds
   };
   const config = formatConfig[format] || formatConfig.short;
   const rounds = body.rounds || config.rounds;
