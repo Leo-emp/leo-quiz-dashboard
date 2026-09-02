@@ -6,7 +6,16 @@
 // ─────────────────────────────────────────────────────────────
 
 import { NextResponse } from "next/server";
+import { timingSafeEqual } from "crypto";
 import { getSession } from "@/lib/auth";
+
+// # Timing-safe string comparison — prevents timing attacks on credentials
+function safeEqual(a: string, b: string): boolean {
+  const bufA = Buffer.from(a)
+  const bufB = Buffer.from(b)
+  if (bufA.length !== bufB.length) return false
+  return timingSafeEqual(bufA, bufB)
+}
 
 export async function POST(request: Request) {
   // Parse the login form data
@@ -33,16 +42,8 @@ export async function POST(request: Request) {
     );
   }
 
-  // Verify email (case-insensitive)
-  if (email.toLowerCase() !== adminEmail.toLowerCase()) {
-    return NextResponse.json(
-      { error: "Invalid credentials" },
-      { status: 401 }
-    );
-  }
-
-  // Verify password (direct comparison)
-  if (password !== adminPassword) {
+  // Verify email (case-insensitive) and password (timing-safe)
+  if (!safeEqual(email.toLowerCase(), adminEmail.toLowerCase()) || !safeEqual(password, adminPassword)) {
     return NextResponse.json(
       { error: "Invalid credentials" },
       { status: 401 }

@@ -29,14 +29,17 @@
 // ─────────────────────────────────────────────────────────────
 
 import { NextResponse } from "next/server";
+import { timingSafeEqual } from "crypto";
 import { getVideo, updateVideo, logActivity } from "@/lib/db";
 
 export async function POST(request: Request) {
-  // -- Verify webhook secret --
+  // -- Verify webhook secret (timing-safe) --
   const secret = request.headers.get("x-webhook-secret");
   const expectedSecret = process.env.DASHBOARD_WEBHOOK_SECRET;
 
-  if (!expectedSecret || secret !== expectedSecret) {
+  if (!expectedSecret || !secret
+    || Buffer.byteLength(secret) !== Buffer.byteLength(expectedSecret)
+    || !timingSafeEqual(Buffer.from(secret), Buffer.from(expectedSecret))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

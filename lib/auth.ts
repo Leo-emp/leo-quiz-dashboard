@@ -50,8 +50,11 @@ export const sessionOptions: SessionOptions = {
 // handing the cookie store to iron-session. This differs from Next.js <15
 // where `cookies()` was synchronous.
 export async function getSession() {
-  // Reads the encrypted session cookie and returns typed session data.
-  // If no session exists, returns defaultSession (isLoggedIn: false).
+  // # Fail-closed: reject requests if SESSION_SECRET is missing in production
+  if (process.env.NODE_ENV === "production" && !process.env.SESSION_SECRET) {
+    throw new Error("SESSION_SECRET must be set in production")
+  }
+
   const cookieStore = await cookies();
   const session = await getIronSession<SessionData>(cookieStore, sessionOptions);
 
